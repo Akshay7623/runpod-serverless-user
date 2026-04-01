@@ -186,6 +186,7 @@ def validate_input(job_input):
     # Validate 'images' in input, if provided
     images = job_input.get("images")
     mediaId = job_input.get("mediaId")
+    
     if images is not None:
         if not isinstance(images, list) or not all(
             "name" in image and "image" in image for image in images
