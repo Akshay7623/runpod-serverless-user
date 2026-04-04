@@ -93,7 +93,7 @@ RUN download() { mkdir -p "$1" && wget -q --show-progress -O "$1/$2" "$3"; } && 
       
 
 # Change working directory to ComfyUI
-WORKDIR /comfyui
+# WORKDIR /comfyui
 
 # Support for the network volume
 # ADD src/extra_model_paths.yaml ./

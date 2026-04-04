@@ -33,7 +33,7 @@ def base64_to_video(base64_file_path, output_path=None):
     if output_path is None:
         # Use same name as input but with .webp extension
         input_path = Path(base64_file_path)
-        output_path = input_path.with_suffix('.webp')
+        output_path = input_path.with_suffix('.mp4')
     
     # Decode base64 to binary
     try:
