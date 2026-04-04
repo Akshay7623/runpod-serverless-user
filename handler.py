@@ -582,6 +582,8 @@ def handler(job):
     media_id = validated_data.get("mediaId")
     msg_data = validated_data.get("msg_data", {})
     
+    print("msg_data from aws lambda", msg_data)
+    
     # Make sure that the ComfyUI HTTP API is available before proceeding
     if not check_server(
         f"http://{COMFY_HOST}/",
