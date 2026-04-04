@@ -72,7 +72,6 @@ def upload_base64_video_to_s3(base64_data, data, media_id):
         video_bytes = base64.b64decode(base64_data)
         
         # 1. Upload to S3
-        
         s3_client.put_object(
             Bucket=bucket_name,
             Key=file_key,
