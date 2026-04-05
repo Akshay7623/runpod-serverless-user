@@ -883,6 +883,7 @@ def handler(job):
             item.get("type") == "base64"
             print(f"worker-comfyui - Uploading video to S3 as {media_id}.mp4...")
             s3_url = upload_base64_video_to_s3(item["data"], msg_data[0], media_id)
+            
             print(f"worker-comfyui - Successfully uploaded: {s3_url}")
         except Exception as e:
             error_msg = f"Failed to upload video to S3: {e}"
