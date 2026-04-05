@@ -63,6 +63,7 @@ def upload_base64_video_to_s3(base64_data, data, media_id):
         workflow_id = data["workflowId"]
         history_id = data["historyId"]
         target_id = data.get("targetId") # Device ID
+        wanNodeID = data.get("wanNodeID")
         bucket_name = data["bucketName"]
         
         file_key = f"{workflow_id}/{history_id}.mp4" 
@@ -89,7 +90,8 @@ def upload_base64_video_to_s3(base64_data, data, media_id):
                     "url": s3_url,
                     "targetId": target_id,
                     "workflowId": workflow_id,
-                    "historyId": history_id
+                    "historyId": history_id,
+                    "wanNodeID":wanNodeID
                     }
                 lambda_client.invoke(
                     FunctionName=data["triggerFunc"],
