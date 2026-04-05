@@ -79,7 +79,6 @@ def upload_base64_video_to_s3(base64_data, data, media_id):
             Body=video_bytes,
             ContentType='video/mp4'
         )
-        
         region = os.environ.get('AWS_REGION', 'ap-south-1')
         s3_url = f"https://{bucket_name}.s3.{region}.amazonaws.com/{file_key}"
         
@@ -91,7 +90,7 @@ def upload_base64_video_to_s3(base64_data, data, media_id):
                     "targetId": target_id,
                     "workflowId": workflow_id,
                     "historyId": history_id,
-                    "wanNodeID":wanNodeID
+                    "wanNodeID": wanNodeID
                     }
                 lambda_client.invoke(
                     FunctionName=data["triggerFunc"],
