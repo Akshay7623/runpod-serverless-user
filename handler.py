@@ -92,7 +92,7 @@ def upload_base64_video_to_s3(base64_data, data, media_id):
                     "historyId": history_id
                     }
                 lambda_client.invoke(
-                    FunctionName=triggerFunc,
+                    FunctionName=data["triggerFunc"],
                     InvocationType='Event',
                     Payload=json.dumps(lambda_payload)
                     )
@@ -101,7 +101,6 @@ def upload_base64_video_to_s3(base64_data, data, media_id):
                 print(f"worker-comfyui - Failed to trigger Lambda: {e}")
         return s3_url
     else:
-        print("something else here")
         bucket_name = os.environ.get('BUCKET_NAME')
         file_key = f"videos/{media_id}.mp4" 
         if "," in base64_data:
