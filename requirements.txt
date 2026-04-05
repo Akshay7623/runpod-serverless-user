@@ -1,5 +1,5 @@
-# fix some problems with the queue
 runpod~=1.7.12
 websocket-client
 requests
+alembic>=1.14.1
 boto3==1.34.100
