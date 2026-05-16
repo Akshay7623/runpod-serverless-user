@@ -56,65 +56,69 @@ lambda_client = boto3.client(
     region_name=os.environ.get('AWS_REGION', 'ap-south-1')
 )
 
-def upload_base64_video_to_s3(base64_data, data, media_id):
-    print("data is in upload_base64_video_to_s3", data)
-    
-    if "workflowId" in data and "historyId" in data and "bucketName" in data:
-        workflow_id = data["workflowId"]
-        history_id = data["historyId"]
-        target_id = data.get("targetId") # Device ID
-        wanNodeID = data.get("wanNodeID")
-        bucket_name = data["bucketName"]
-        
-        file_key = f"{workflow_id}/{history_id}.mp4" 
-        
+def upload_base64_video_to_s3(base64_data, data):
+    print("Processing upload with data:", data)
+
+    bucket_name = data.get("bucketName", os.environ.get('BUCKET_NAME'))
+
+    if "workflowId" in data and "historyId" in data:
+        workflowId = data.get("workflowId", None)
+        historyId = data.get("historyId", None)
+        targetId = data.get("targetId", None)
+
+        file_key = f"outputs/{workflowId}/{historyId}.mp4"
+
+        # Handle data URI prefix
         if "," in base64_data:
             base64_data = base64_data.split(",")[1]
         video_bytes = base64.b64decode(base64_data)
-        
         # 1. Upload to S3
-        s3_client.put_object(
-            Bucket=bucket_name,
-            Key=file_key,
-            Body=video_bytes,
-            ContentType='video/mp4'
-        )
-        region = os.environ.get('AWS_REGION', 'ap-south-1')
+        s3_client.put_object(Bucket=bucket_name,Key=file_key,Body=video_bytes,ContentType='video/mp4')
         s3_url = f"https://{bucket_name}.s3.{region}.amazonaws.com/{file_key}"
-        
-        # 2. Call the Lambda function to notify your Admin/Backend
-        if data["triggerFunc"]:
+
+        # 2. Call Lambda
+        trigger_func = data.get("triggerFunc")
+        if trigger_func:
             try:
-                lambda_payload = {
-                    "url": s3_url,
-                    "targetId": target_id,
-                    "workflowId": workflow_id,
-                    "historyId": history_id,
-                    "wanNodeID": wanNodeID
-                    }
+                # Include the URL in the payload sent to your backend
+                lambda_payload = {"url": s3_url, **data}
                 lambda_client.invoke(
-                    FunctionName=data["triggerFunc"],
+                    FunctionName=trigger_func,
                     InvocationType='Event',
                     Payload=json.dumps(lambda_payload)
-                    )
-                print(f"worker-comfyui - Notified Lambda for workflow: {workflow_id}")
+                )
+                print(f"worker-comfyui - Notified Lambda: {trigger_func}")
             except Exception as e:
                 print(f"worker-comfyui - Failed to trigger Lambda: {e}")
+
         return s3_url
     else:
-        bucket_name = os.environ.get('BUCKET_NAME')
-        file_key = f"videos/{media_id}.mp4" 
+        # Default fallback branch
+        media_id = str(uuid.uuid4())
+        file_key = f"videos/{media_id}.mp4"
+
         if "," in base64_data:
             base64_data = base64_data.split(",")[1]
+
         video_bytes = base64.b64decode(base64_data)
-        
-        s3_client.put_object(
-            Bucket=bucket_name,
-            Key=file_key,
-            Body=video_bytes,
-            ContentType='video/mp4'
-            )
-        region = os.environ.get('AWS_REGION', 'ap-south-1')
+        s3_client.put_object(Bucket=bucket_name, Key=file_key, Body=video_bytes, ContentType='video/mp4')
+        s3_url = f"https://{bucket_name}.s3.{region}.amazonaws.com/{file_key}"
+
+        trigger_func = data.get("triggerFunc")
+
+        if trigger_func:
+            try:
+                # Include the URL in the payload sent to your backend
+                lambda_payload = {"url": s3_url, **data}
+                lambda_client.invoke(
+                    FunctionName=trigger_func,
+                    InvocationType='Event',
+                    Payload=json.dumps(lambda_payload)
+                )
+                print(f"worker-comfyui - Notified Lambda: {trigger_func}")
+            except Exception as e:
+                print(f"worker-comfyui - Failed to trigger Lambda: {e}")
+
         return f"https://{bucket_name}.s3.{region}.amazonaws.com/{file_key}"
 # ---------------------------------------------------------------------------
 # Helper: quick reachability probe of ComfyUI HTTP endpoint (port 8188)
@@ -203,7 +207,6 @@ def _attempt_websocket_reconnect(ws_url, max_attempts, delay_s, initial_error):
         f"Connection closed and failed to reconnect. Last error: {last_reconnect_error}"
     )
 
-
 def validate_input(job_input):
     """
     Validates the input for the handler function.
@@ -215,38 +218,24 @@ def validate_input(job_input):
         tuple: A tuple containing the validated data and an error message, if any.
                The structure is (validated_data, error_message).
     """
-    # Validate if job_input is provided
     if job_input is None:
         return None, "Please provide input"
 
-    # Check if input is a string and try to parse it as JSON
     if isinstance(job_input, str):
         try:
             job_input = json.loads(job_input)
         except json.JSONDecodeError:
             return None, "Invalid JSON format in input"
 
-    # Validate 'workflow' in input
     workflow = job_input.get("workflow")
     if workflow is None:
         return None, "Missing 'workflow' parameter"
 
-    # Validate 'images' in input, if provided
-    images = job_input.get("images")
-    mediaId = job_input.get("mediaId")
-    msg_data = job_input.get("data")
-    
-    if images is not None:
-        if not isinstance(images, list) or not all(
-            "name" in image and "image" in image for image in images
-        ):
-            return (
-                None,
-                "'images' must be a list of objects with 'name' and 'image' keys",
-            )
-
-    # Return validated data and no error
-    return {"workflow": workflow, "images": images, "mediaId": mediaId, "msg_data": msg_data }, None
+    return {
+        "workflow": workflow,
+        "images": job_input.get("images"),
+        "client_data": job_input.get("data")
+    }, None
 
 
 def check_server(url, retries=500, delay=50):
@@ -565,24 +554,23 @@ def handler(job):
     Returns:
         dict: A dictionary containing either an error message or a success status with generated images.
     """
-    job_input = job["input"]
-    job_id = job["id"]
-    
+
+    job_input = job.get("input", {})
+    job_id = job.get("id", "no-id-found")
+
 
     # Make sure that the input is valid
     validated_data, error_message = validate_input(job_input)
+
     if error_message:
+        print(f"Job {job_id} failed: {error_message}")
         return {"error": error_message}
 
     # Extract validated data
     workflow = validated_data["workflow"]
-    
     input_images = validated_data.get("images")
-    media_id = validated_data.get("mediaId")
-    msg_data = validated_data.get("msg_data", {})
-    
-    print("msg_data from aws lambda", msg_data[0])
-    
+    client_data = validated_data.get("client_data", {})
+
     # Make sure that the ComfyUI HTTP API is available before proceeding
     if not check_server(
         f"http://{COMFY_HOST}/",
@@ -874,18 +862,21 @@ def handler(job):
         final_result["images"] = []
 
     print(f"worker-comfyui - Job completed. Returning {len(output_data)} image(s).")
-    
+
     if "images" in final_result:
         try:
-            if media_id is None:
-                media_id = str(uuid.uuid4())
             item = final_result["images"][0]
-            item.get("type") == "base64"
-            print(f"worker-comfyui - Uploading video to S3 as {media_id}.mp4...")
-            s3_url = upload_base64_video_to_s3(item["data"], msg_data[0], media_id)
-            
-            print(f"worker-comfyui - Successfully uploaded: {s3_url}")
+            s3_url = upload_base64_video_to_s3(item["data"], client_data)
+            final_result["s3_url"] = s3_url
+            final_result["job_id"] = job_id
+
+            return {
+                "status": "success",
+                "s3_url": s3_url,
+                "job_id": job_id
+            }
         except Exception as e:
+            # final error control comes here::
             error_msg = f"Failed to upload video to S3: {e}"
             print(f"worker-comfyui - {error_msg}")
     return final_result
