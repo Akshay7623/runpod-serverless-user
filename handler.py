@@ -58,7 +58,7 @@ lambda_client = boto3.client(
 
 def upload_base64_video_to_s3(base64_data, data):
     print("Processing upload with data:", data)
-
+    region = os.environ.get('AWS_REGION', 'ap-south-1')
     bucket_name = data.get("bucketName", os.environ.get('BUCKET_NAME'))
 
     if "workflowId" in data and "historyId" in data:
