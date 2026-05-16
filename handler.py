@@ -67,7 +67,6 @@ def upload_base64_video_to_s3(base64_data, data):
         targetId = data.get("targetId", None)
 
         file_key = f"outputs/{workflowId}/{historyId}.mp4"
-
         # Handle data URI prefix
         if "," in base64_data:
             base64_data = base64_data.split(",")[1]
