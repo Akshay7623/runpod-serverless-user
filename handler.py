@@ -554,7 +554,6 @@ def handler(job):
     Returns:
         dict: A dictionary containing either an error message or a success status with generated images.
     """
-
     job_input = job.get("input", {})
     job_id = job.get("id", "no-id-found")
 
