@@ -25,25 +25,25 @@ ENV UV_NO_CACHE=1
 # Install Python, git and other necessary tools
 # NEW: Added --no-install-recommends to block Ubuntu bloatware
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3.12 \
-    python3.12-venv \
-    git \
-    wget \
-    libgl1 \
-    libglib2.0-0 \
-    libsm6 \
-    libxext6 \
-    libxrender1 \
-    ffmpeg \
-    && ln -sf /usr/bin/python3.12 /usr/bin/python \
-    && ln -sf /usr/bin/pip3 /usr/bin/pip \
-    && apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
+  python3.12 \
+  python3.12-venv \
+  git \
+  wget \
+  libgl1 \
+  libglib2.0-0 \
+  libsm6 \
+  libxext6 \
+  libxrender1 \
+  ffmpeg \
+  && ln -sf /usr/bin/python3.12 /usr/bin/python \
+  && ln -sf /usr/bin/pip3 /usr/bin/pip \
+  && apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
 # Install uv (latest) using official installer and create isolated venv
 RUN wget -qO- https://astral.sh/uv/install.sh | sh \
-    && ln -s /root/.local/bin/uv /usr/local/bin/uv \
-    && ln -s /root/.local/bin/uvx /usr/local/bin/uvx \
-    && uv venv /opt/venv
+  && ln -s /root/.local/bin/uv /usr/local/bin/uv \
+  && ln -s /root/.local/bin/uvx /usr/local/bin/uvx \
+  && uv venv /opt/venv
 
 # Use the virtual environment for all subsequent commands
 ENV PATH="/opt/venv/bin:${PATH}"
@@ -54,50 +54,50 @@ RUN uv pip install alembic==1.18.4 SQLAlchemy==2.0.49 comfy_aimdo==0.2.12 comfy-
 
 # Install ComfyUI
 RUN if [ -n "${CUDA_VERSION_FOR_COMFY}" ]; then \
-      /usr/bin/yes | comfy --workspace /comfyui install --version "${COMFYUI_VERSION}" --cuda-version "${CUDA_VERSION_FOR_COMFY}" --nvidia; \
-    else \
-      /usr/bin/yes | comfy --workspace /comfyui install --version "${COMFYUI_VERSION}" --nvidia; \
-    fi
+  /usr/bin/yes | comfy --workspace /comfyui install --version "${COMFYUI_VERSION}" --cuda-version "${CUDA_VERSION_FOR_COMFY}" --nvidia; \
+  else \
+  /usr/bin/yes | comfy --workspace /comfyui install --version "${COMFYUI_VERSION}" --nvidia; \
+  fi
 
 # Upgrade PyTorch if needed
 RUN if [ "$ENABLE_PYTORCH_UPGRADE" = "true" ]; then \
-      uv pip install --force-reinstall torch torchvision torchaudio --index-url ${PYTORCH_INDEX_URL}; \
-    fi
+  uv pip install --force-reinstall torch torchvision torchaudio --index-url ${PYTORCH_INDEX_URL}; \
+  fi
 
-RUN download() { mkdir -p "$1" && wget -q --show-progress -O "$1/$2" "$3"; } && \
-    \
-    # text_encoders
-    download /comfyui/models/text_encoders \
-      umt5_xxl_fp8_e4m3fn_scaled.safetensors \
-      "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors" && \
-    \
-    # vae
-    download /comfyui/models/vae \
-      wan_2.1_vae.safetensors \
-      "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors" && \
-    \
-    # diffusion_models
-    download /comfyui/models/diffusion_models \
-      wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors \
-      "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors" && \
-    download /comfyui/models/diffusion_models \
-      wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors \
-      "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors" && \
-    \
-    # loras
-    download /comfyui/models/loras \
-      wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors \
-      "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors" && \
-    download /comfyui/models/loras \
-      wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors \
-      "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors"
-      
+# RUN download() { mkdir -p "$1" && wget -q --show-progress -O "$1/$2" "$3"; } && \
+#     \
+#     # text_encoders
+#     download /comfyui/models/text_encoders \
+#       umt5_xxl_fp8_e4m3fn_scaled.safetensors \
+#       "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors" && \
+#     \
+#     # vae
+#     download /comfyui/models/vae \
+#       wan_2.1_vae.safetensors \
+#       "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors" && \
+#     \
+#     # diffusion_models
+#     download /comfyui/models/diffusion_models \
+#       wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors \
+#       "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors" && \
+#     download /comfyui/models/diffusion_models \
+#       wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors \
+#       "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors" && \
+#     \
+#     # loras
+#     download /comfyui/models/loras \
+#       wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors \
+#       "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors" && \
+#     download /comfyui/models/loras \
+#       wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors \
+#       "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors"
+
 
 # Change working directory to ComfyUI
-# WORKDIR /comfyui
+WORKDIR /comfyui
 
 # Support for the network volume
-# ADD src/extra_model_paths.yaml ./
+ADD src/extra_model_paths.yaml ./
 
 # Go back to the root
 WORKDIR /

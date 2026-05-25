@@ -1,20 +1,20 @@
-import runpod
-from runpod.serverless.utils import rp_upload
+import base64
 import json
-import urllib.request
-import urllib.parse
-import time
 import os
-import requests
-import base64
-from io import BytesIO
-import websocket
-import uuid
-import tempfile
 import socket
+import tempfile
+import time
 import traceback
-import base64
+import urllib.parse
+import urllib.request
+import uuid
+from io import BytesIO
+
 import boto3
+import requests
+import runpod
+import websocket
+from runpod.serverless.utils import rp_upload
 
 # Time to wait between API check attempts in milliseconds
 COMFY_API_AVAILABLE_INTERVAL_MS = 50
@@ -43,48 +43,50 @@ REFRESH_WORKER = os.environ.get("REFRESH_WORKER", "false").lower() == "true"
 
 
 s3_client = boto3.client(
-    's3',
-    aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID'),
-    aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY'),
-    region_name=os.environ.get('AWS_REGION', 'ap-south-1')
+    "s3",
+    aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"),
+    aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"),
+    region_name=os.environ.get("AWS_REGION", "ap-south-1"),
 )
 
 lambda_client = boto3.client(
-    'lambda',
-    aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID'),
-    aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY'),
-    region_name=os.environ.get('AWS_REGION', 'ap-south-1')
+    "lambda",
+    aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"),
+    aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"),
+    region_name=os.environ.get("AWS_REGION", "ap-south-1"),
 )
 
 def upload_base64_video_to_s3(base64_data, data):
     print("Processing upload with data:", data)
-    region = os.environ.get('AWS_REGION', 'ap-south-1')
-    bucket_name = data.get("bucketName", os.environ.get('BUCKET_NAME'))
+    region = os.environ.get("AWS_REGION", "ap-south-1")
+    bucket_name = data.get("bucketName", os.environ.get("BUCKET_NAME"))
 
-    if "workflowId" in data and "historyId" in data:
+    if "workflowId" in data and "generationId" in data:
         workflowId = data.get("workflowId", None)
-        historyId = data.get("historyId", None)
-        targetId = data.get("targetId", None)
+        generationId = data.get("generationId", None)
 
-        file_key = f"outputs/{workflowId}/{historyId}.mp4"
+        file_key = f"outputs/{workflowId}/{generationId}.mp4"
         # Handle data URI prefix
         if "," in base64_data:
             base64_data = base64_data.split(",")[1]
         video_bytes = base64.b64decode(base64_data)
         # 1. Upload to S3
-        s3_client.put_object(Bucket=bucket_name,Key=file_key,Body=video_bytes,ContentType='video/mp4')
+        s3_client.put_object(
+            Bucket=bucket_name, Key=file_key, Body=video_bytes, ContentType="video/mp4"
+        )
         s3_url = f"https://{bucket_name}.s3.{region}.amazonaws.com/{file_key}"
 
         # 2. Call Lambda
         trigger_func = data.get("triggerFunc")
+
         if trigger_func:
             try:
                 # Include the URL in the payload sent to your backend
                 lambda_payload = {"url": s3_url, **data}
                 lambda_client.invoke(
                     FunctionName=trigger_func,
-                    InvocationType='Event',
-                    Payload=json.dumps(lambda_payload)
+                    InvocationType="Event",
+                    Payload=json.dumps(lambda_payload),
                 )
                 print(f"worker-comfyui - Notified Lambda: {trigger_func}")
             except Exception as e:
@@ -100,7 +102,9 @@ def upload_base64_video_to_s3(base64_data, data):
             base64_data = base64_data.split(",")[1]
 
         video_bytes = base64.b64decode(base64_data)
-        s3_client.put_object(Bucket=bucket_name, Key=file_key, Body=video_bytes, ContentType='video/mp4')
+        s3_client.put_object(
+            Bucket=bucket_name, Key=file_key, Body=video_bytes, ContentType="video/mp4"
+        )
         s3_url = f"https://{bucket_name}.s3.{region}.amazonaws.com/{file_key}"
 
         trigger_func = data.get("triggerFunc")
@@ -111,14 +115,16 @@ def upload_base64_video_to_s3(base64_data, data):
                 lambda_payload = {"url": s3_url, **data}
                 lambda_client.invoke(
                     FunctionName=trigger_func,
-                    InvocationType='Event',
-                    Payload=json.dumps(lambda_payload)
+                    InvocationType="Event",
+                    Payload=json.dumps(lambda_payload),
                 )
                 print(f"worker-comfyui - Notified Lambda: {trigger_func}")
             except Exception as e:
                 print(f"worker-comfyui - Failed to trigger Lambda: {e}")
 
         return f"https://{bucket_name}.s3.{region}.amazonaws.com/{file_key}"
+
+
 # ---------------------------------------------------------------------------
 # Helper: quick reachability probe of ComfyUI HTTP endpoint (port 8188)
 # ---------------------------------------------------------------------------
@@ -206,6 +212,7 @@ def _attempt_websocket_reconnect(ws_url, max_attempts, delay_s, initial_error):
         f"Connection closed and failed to reconnect. Last error: {last_reconnect_error}"
     )
 
+
 def validate_input(job_input):
     """
     Validates the input for the handler function.
@@ -233,7 +240,7 @@ def validate_input(job_input):
     return {
         "workflow": workflow,
         "images": job_input.get("images"),
-        "client_data": job_input.get("data")
+        "client_data": job_input.get("data"),
     }, None
 
 
@@ -556,7 +563,6 @@ def handler(job):
     job_input = job.get("input", {})
     job_id = job.get("id", "no-id-found")
 
-
     # Make sure that the input is valid
     validated_data, error_message = validate_input(job_input)
 
@@ -864,20 +870,20 @@ def handler(job):
     if "images" in final_result:
         try:
             item = final_result["images"][0]
+
             s3_url = upload_base64_video_to_s3(item["data"], client_data)
             final_result["s3_url"] = s3_url
             final_result["job_id"] = job_id
 
-            return {
-                "status": "success",
-                "s3_url": s3_url,
-                "job_id": job_id
-            }
+            # return will be stored in runpod server:
+            return {"status": "success", "s3_url": s3_url, "job_id": job_id}
         except Exception as e:
             # final error control comes here::
             error_msg = f"Failed to upload video to S3: {e}"
+            # call the failure trigger function
             print(f"worker-comfyui - {error_msg}")
     return final_result
+
 
 if __name__ == "__main__":
     print("worker-comfyui - Starting handler...")
