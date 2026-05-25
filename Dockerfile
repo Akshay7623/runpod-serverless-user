@@ -49,7 +49,7 @@ RUN wget -qO- https://astral.sh/uv/install.sh | sh \
 ENV PATH="/opt/venv/bin:${PATH}"
 
 # Install comfy-cli + dependencies
-RUN uv pip install comfy-cli==1.5.2 pip setuptools wheel
+RUN uv pip install comfy-cli==1.5.2 pip==25.1.1 setuptools==80.8.0 wheel==0.45.1
 RUN uv pip install alembic==1.18.4 SQLAlchemy==2.0.49 comfy_aimdo==0.2.12 comfy-kitchen==0.2.8 safetensors==0.7.0
 
 
@@ -65,40 +65,39 @@ RUN if [ "$ENABLE_PYTORCH_UPGRADE" = "true" ]; then \
   uv pip install --force-reinstall torch torchvision torchaudio --index-url ${PYTORCH_INDEX_URL}; \
   fi
 
-# RUN download() { mkdir -p "$1" && wget -q --show-progress -O "$1/$2" "$3"; } && \
-#     \
-#     # text_encoders
-#     download /comfyui/models/text_encoders \
-#       umt5_xxl_fp8_e4m3fn_scaled.safetensors \
-#       "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors" && \
-#     \
-#     # vae
-#     download /comfyui/models/vae \
-#       wan_2.1_vae.safetensors \
-#       "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors" && \
-#     \
-#     # diffusion_models
-#     download /comfyui/models/diffusion_models \
-#       wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors \
-#       "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors" && \
-#     download /comfyui/models/diffusion_models \
-#       wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors \
-#       "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors" && \
-#     \
-#     # loras
-#     download /comfyui/models/loras \
-#       wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors \
-#       "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors" && \
-#     download /comfyui/models/loras \
-#       wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors \
-#       "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors"
+RUN download() { mkdir -p "$1" && wget -q --show-progress -O "$1/$2" "$3"; } && \
+  \
+  # text_encoders
+  download /comfyui/models/text_encoders \
+  umt5_xxl_fp8_e4m3fn_scaled.safetensors \
+  "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors" && \
+  \
+  # vae
+  download /comfyui/models/vae \
+  wan_2.1_vae.safetensors \
+  "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors" && \
+  \
+  # diffusion_models
+  download /comfyui/models/diffusion_models \
+  wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors \
+  "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors" && \
+  download /comfyui/models/diffusion_models \
+  wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors \
+  "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors" && \
+  \
+  # loras
+  download /comfyui/models/loras \
+  wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors \
+  "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors" && \
+  download /comfyui/models/loras \
+  wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors \
+  "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors"
 
-
-# Change working directory to ComfyUI
-WORKDIR /comfyui
-
-# Support for the network volume
-ADD src/extra_model_paths.yaml ./
+# Uncomment while using the network volume
+# 1. Change working directory to ComfyUI
+# WORKDIR /comfyui
+# 2. Support for the network volume
+# ADD src/extra_model_paths.yaml ./
 
 # Go back to the root
 WORKDIR /
