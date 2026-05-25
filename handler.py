@@ -881,6 +881,19 @@ def handler(job):
             # final error control comes here::
             error_msg = f"Failed to upload video to S3: {e}"
             # call the failure trigger function
+            try:
+                failure_function = client_data.get("failureFunc")
+                
+                lambda_client.invoke(
+                    FunctionName=failure_function,
+                    InvocationType="Event",
+                    Payload=json.dumps(client_data),
+                )
+
+                print(f"worker-comfyui - Notified Lambda: {failure_function}")
+            except Exception as e:
+                print(f"failed to trigger failure controller function: {e}")
+
             print(f"worker-comfyui - {error_msg}")
     return final_result
 
