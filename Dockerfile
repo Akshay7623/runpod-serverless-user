@@ -50,7 +50,7 @@ ENV PATH="/opt/venv/bin:${PATH}"
 
 # Install comfy-cli + dependencies
 RUN uv pip install comfy-cli pip setuptools wheel
-RUN uv pip install alembic==1.18.4 SQLAlchemy==2.0.49 comfy_aimdo==0.2.12 comfy-kitchen==0.2.8 safetensors==0.7.0
+RUN uv pip install alembic==1.18.4 SQLAlchemy==2.0.49 comfy_aimdo==0.2.12 comfy-kitchen==0.2.8 safetensors==0.7.0 einops
 
 # Install ComfyUI
 RUN if [ -n "${CUDA_VERSION_FOR_COMFY}" ]; then \
@@ -103,7 +103,7 @@ ADD src/extra_model_paths.yaml ./
 WORKDIR /
 
 # Install Python runtime dependencies for the handler
-RUN uv pip install runpod requests websocket-client
+RUN uv pip install runpod requests websocket-client boto3
 
 # Add application code and scripts
 ADD src/start.sh handler.py test_input.json ./
