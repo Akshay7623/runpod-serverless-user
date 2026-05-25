@@ -50,7 +50,7 @@ ENV PATH="/opt/venv/bin:${PATH}"
 
 # Install comfy-cli + dependencies
 RUN uv pip install comfy-cli==1.5.2 pip setuptools wheel
-RUN uv pip install alembic==1.18.4 SQLAlchemy==2.0.49 comfy_aimdo==1.0.18 comfy-kitchen==0.2.8 safetensors==0.7.0
+RUN uv pip install alembic==1.18.4 SQLAlchemy==2.0.49 comfy_aimdo==0.2.12 comfy-kitchen==0.2.8 safetensors==0.7.0
 
 
 # Install ComfyUI
