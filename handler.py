@@ -57,72 +57,58 @@ lambda_client = boto3.client(
 )
 
 def upload_base64_video_to_s3(base64_data, data):
+    """Store the rendered video in S3, then tell the backend where it landed.
+
+    One worker serves both callers, and they name their job record differently:
+    an admin sub-template run sends `historyId`, a user generation sends
+    `generationId`. Accept either, and key the object on whichever arrived so
+    the triggered Lambda can find its own record.
+    """
+    data = data or {}
     print("Processing upload with data:", data)
+
     region = os.environ.get("AWS_REGION", "ap-south-1")
     bucket_name = data.get("bucketName", os.environ.get("BUCKET_NAME"))
 
-    if "workflowId" in data and "generationId" in data:
-        workflowId = data.get("workflowId", None)
-        generationId = data.get("generationId", None)
+    workflow_id = data.get("workflowId")
+    record_id = data.get("generationId") or data.get("historyId")
 
-        file_key = f"outputs/{workflowId}/{generationId}.mp4"
-        # Handle data URI prefix
-        if "," in base64_data:
-            base64_data = base64_data.split(",")[1]
-        video_bytes = base64.b64decode(base64_data)
-        # 1. Upload to S3
-        s3_client.put_object(
-            Bucket=bucket_name, Key=file_key, Body=video_bytes, ContentType="video/mp4"
-        )
-        s3_url = f"https://{bucket_name}.s3.{region}.amazonaws.com/{file_key}"
-
-        # 2. Call Lambda
-        trigger_func = data.get("triggerFunc")
-
-        if trigger_func:
-            try:
-                # Include the URL in the payload sent to your backend
-                lambda_payload = {"url": s3_url, **data}
-                lambda_client.invoke(
-                    FunctionName=trigger_func,
-                    InvocationType="Event",
-                    Payload=json.dumps(lambda_payload),
-                )
-                print(f"worker-comfyui - Notified Lambda: {trigger_func}")
-            except Exception as e:
-                print(f"worker-comfyui - Failed to trigger Lambda: {e}")
-
-        return s3_url
+    if workflow_id and record_id:
+        file_key = f"outputs/{workflow_id}/{record_id}.mp4"
     else:
-        # Default fallback branch
-        media_id = str(uuid.uuid4())
-        file_key = f"videos/{media_id}.mp4"
+        # Nothing to attach the file to (a bare test invocation, say) — park it
+        # under a standalone key rather than writing outputs/None.mp4.
+        file_key = f"videos/{uuid.uuid4()}.mp4"
 
-        if "," in base64_data:
-            base64_data = base64_data.split(",")[1]
+    # Handle data URI prefix
+    if "," in base64_data:
+        base64_data = base64_data.split(",")[1]
 
-        video_bytes = base64.b64decode(base64_data)
-        s3_client.put_object(
-            Bucket=bucket_name, Key=file_key, Body=video_bytes, ContentType="video/mp4"
-        )
-        s3_url = f"https://{bucket_name}.s3.{region}.amazonaws.com/{file_key}"
+    # 1. Upload to S3
+    s3_client.put_object(
+        Bucket=bucket_name,
+        Key=file_key,
+        Body=base64.b64decode(base64_data),
+        ContentType="video/mp4",
+    )
+    s3_url = f"https://{bucket_name}.s3.{region}.amazonaws.com/{file_key}"
 
-        trigger_func = data.get("triggerFunc")
+    # 2. Call Lambda
+    trigger_func = data.get("triggerFunc")
 
-        if trigger_func:
-            try:
-                # Include the URL in the payload sent to your backend
-                lambda_payload = {"url": s3_url, **data}
-                lambda_client.invoke(
-                    FunctionName=trigger_func,
-                    InvocationType="Event",
-                    Payload=json.dumps(lambda_payload),
-                )
-                print(f"worker-comfyui - Notified Lambda: {trigger_func}")
-            except Exception as e:
-                print(f"worker-comfyui - Failed to trigger Lambda: {e}")
+    if trigger_func:
+        try:
+            # Include the URL in the payload sent to your backend
+            lambda_client.invoke(
+                FunctionName=trigger_func,
+                InvocationType="Event",
+                Payload=json.dumps({"url": s3_url, **data}),
+            )
+            print(f"worker-comfyui - Notified Lambda: {trigger_func}")
+        except Exception as e:
+            print(f"worker-comfyui - Failed to trigger Lambda: {e}")
 
-        return f"https://{bucket_name}.s3.{region}.amazonaws.com/{file_key}"
+    return s3_url
 
 
 # ---------------------------------------------------------------------------
@@ -550,7 +536,61 @@ def get_image_data(filename, subfolder, image_type):
         return None
 
 
-def handler(job):
+# ---------------------------------------------------------------------------
+# Helper: report a dead job back to AWS
+# ---------------------------------------------------------------------------
+
+
+def _client_data_from(job):
+    """Pull the caller's `data` block off a raw job, tolerating bad input.
+
+    Mirrors validate_input's parsing so the failure callback stays reachable
+    even when validation itself is what failed.
+    """
+    job_input = job.get("input", {})
+
+    if isinstance(job_input, str):
+        try:
+            job_input = json.loads(job_input)
+        except json.JSONDecodeError:
+            return None
+
+    if not isinstance(job_input, dict):
+        return None
+
+    client_data = job_input.get("data")
+    return client_data if isinstance(client_data, dict) else None
+
+
+def notify_failure(client_data, reason):
+    """Invoke the backend's failure Lambda so a dead job doesn't strand the user.
+
+    RunPod records the error on its own job record, but nothing on the AWS side
+    polls that. Without this call the generation sits at "processing" forever
+    and the user never gets their credits back.
+
+    Safe to call with anything: a job with no `data` block, or one whose caller
+    did not ask for a failure callback, simply does nothing.
+    """
+    if not isinstance(client_data, dict):
+        return
+
+    failure_function = client_data.get("failureFunc")
+    if not failure_function:
+        return
+
+    try:
+        lambda_client.invoke(
+            FunctionName=failure_function,
+            InvocationType="Event",
+            Payload=json.dumps({**client_data, "reason": reason}),
+        )
+        print(f"worker-comfyui - Notified failure Lambda: {failure_function}")
+    except Exception as e:
+        print(f"worker-comfyui - Failed to trigger failure Lambda: {e}")
+
+
+def _run_job(job):
     """
     Handles a job using ComfyUI via websockets for status and image retrieval.
 
@@ -880,22 +920,30 @@ def handler(job):
         except Exception as e:
             # final error control comes here::
             error_msg = f"Failed to upload video to S3: {e}"
-            # call the failure trigger function
-            try:
-                failure_function = client_data.get("failureFunc")
-                
-                lambda_client.invoke(
-                    FunctionName=failure_function,
-                    InvocationType="Event",
-                    Payload=json.dumps(client_data),
-                )
-
-                print(f"worker-comfyui - Notified Lambda: {failure_function}")
-            except Exception as e:
-                print(f"failed to trigger failure controller function: {e}")
-
             print(f"worker-comfyui - {error_msg}")
+            notify_failure(client_data, error_msg)
     return final_result
+
+
+def handler(job):
+    """Run a job, and make sure the backend hears about it if it dies.
+
+    _run_job has around ten early returns covering unreachable ComfyUI, input
+    upload failures, websocket drops and workflow execution errors. Each one is
+    a dead end for the caller, so every error return is funnelled through
+    notify_failure from this single place rather than being wired up at each
+    return site -- a future early return is then covered automatically.
+    """
+    result = _run_job(job)
+
+    if isinstance(result, dict) and "error" in result:
+        reason = str(result["error"])
+        details = result.get("details")
+        if details:
+            reason = f"{reason}: {details}"
+        notify_failure(_client_data_from(job), reason)
+
+    return result
 
 
 if __name__ == "__main__":
